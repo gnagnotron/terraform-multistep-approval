@@ -1,6 +1,11 @@
 variable "globalaccount" {
   description = "Subdomain of the SAP BTP global account"
   type        = string
+
+  validation {
+    condition     = length(trimspace(var.globalaccount)) > 0
+    error_message = "globalaccount must be set (issue form or GLOBALACCOUNT secret)."
+  }
 }
 
 variable "project_name" {

@@ -43,6 +43,10 @@ jobs:
           if [ -z "$globalaccount" ]; then
             globalaccount="$GLOBALACCOUNT_DEFAULT"
           fi
+          if [ -z "$globalaccount" ]; then
+            echo "Error: globalaccount is empty. Provide it in the issue form or set the GLOBALACCOUNT environment secret."
+            exit 1
+          fi
 
           project_name=$(jq -r '.["project-name"] // ""' local.json)
           project_costcenter=$(jq -r '.["cost-center"] // ""' local.json)
@@ -68,6 +72,13 @@ jobs:
 
           integration_suite_subaccounts_json=$(jq -c -r '
             (.["integration-suite-subaccounts"] // [])
+            | if type == "array" then
+                map(tostring)
+              elif type == "string" then
+                split("\n") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))
+              else
+                []
+              end
           ' local.json)
 
           integration_suite_plan_candidates_json=$(jq -c -r '
