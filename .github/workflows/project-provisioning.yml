@@ -148,11 +148,7 @@ jobs:
           TF_VAR_integration_suite_plan_name_candidates: ${{ steps.tf_inputs.outputs.integration_suite_plan_candidates_json }}
           TF_VAR_integration_suite_entitlement_amount: ${{ steps.tf_inputs.outputs.integration_suite_entitlement_amount }}
           TF_VAR_integration_suite_existing_subaccount_ids: ${{ steps.tf_inputs.outputs.integration_suite_subaccount_ids_json }}
-        run: |
-          if [[ "${{ contains(github.event.issue.title, '[INTEGRATION SUITE REQUEST]') }}" == "true" ]]; then
-            export TF_VAR_subaccounts='{}'
-          fi
-          terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} apply -auto-approve -no-color
+        run: terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} apply -auto-approve -no-color
 
       - name: Capture Terraform Outputs
         id: tf_output
