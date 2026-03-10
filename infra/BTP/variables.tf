@@ -72,3 +72,63 @@ variable "subaccounts" {
     error_message = "Each subaccount stage must be one of DEV, TEST or PROD."
   }
 }
+
+variable "integration_suite_enabled" {
+  description = "Enable Integration Suite entitlement, subscription and role assignments"
+  type        = bool
+  default     = false
+}
+
+variable "integration_suite_subaccounts" {
+  description = "Subaccount keys where Integration Suite should be enabled"
+  type        = list(string)
+  default     = ["test", "prod"]
+}
+
+variable "integration_suite_admin_users" {
+  description = "Users to assign Integration Suite focused role collections in selected subaccounts"
+  type        = list(string)
+  default     = []
+}
+
+variable "integration_suite_assign_roles_to_full_admins" {
+  description = "Also assign Integration Suite focused roles to users already listed as subaccount full admins"
+  type        = bool
+  default     = false
+}
+
+variable "integration_suite_role_collection_patterns" {
+  description = "Case-insensitive substrings used to match Integration Suite role collection names"
+  type        = list(string)
+  default = [
+    "integration",
+    "suite"
+  ]
+}
+
+variable "integration_suite_service_name" {
+  description = "Technical service name used for entitlement and subscription"
+  type        = string
+  default     = "integrationsuite-trial"
+}
+
+variable "integration_suite_plan_name" {
+  description = "Optional fixed plan name override for Integration Suite. Leave empty to auto-select"
+  type        = string
+  default     = ""
+}
+
+variable "integration_suite_plan_name_candidates" {
+  description = "Ordered candidate plan names used when integration_suite_plan_name is empty"
+  type        = list(string)
+  default = [
+    "trial",
+    "standard"
+  ]
+}
+
+variable "integration_suite_entitlement_amount" {
+  description = "Entitlement amount for Integration Suite in each selected subaccount"
+  type        = number
+  default     = 1
+}
