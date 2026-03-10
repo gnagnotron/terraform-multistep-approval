@@ -26,12 +26,6 @@ variable "subaccount_full_admins" {
   default     = []
 }
 
-variable "subaccount_full_admins" {
-  description = "List of users to assign all available role collections on every subaccount"
-  type        = list(string)
-  default     = []
-}
-
 variable "subaccounts" {
   description = "Map of SAP BTP subaccounts to create. By default it creates test and prod."
   type = map(object({
