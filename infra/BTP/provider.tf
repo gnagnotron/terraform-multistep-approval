@@ -1,16 +1,17 @@
-
 terraform {
   required_providers {
     btp = {
       source  = "SAP/btp"
-      version = "~> 1.8.0"
+      version = "~> 1.20.0"
+    }
+
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
     }
   }
-
 }
 
-# Please checkout documentation on how best to authenticate against SAP BTP
-# via the Terraform provider for SAP BTP
 provider "btp" {
   globalaccount = var.globalaccount
 }

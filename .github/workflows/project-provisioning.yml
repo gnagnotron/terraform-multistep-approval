@@ -1,45 +1,26 @@
 name: Project Provisioning
 
-concurrency:
-  group: dev
-  cancel-in-progress: true
-
 on:
   issues:
-    types: [opened, edited]
+    types: [opened]
 
 permissions:
   issues: write
+  contents: read
 
 env:
-  PATH_TO_TFSCRIPT_BTP: 'infra/BTP'
-  PATH_TO_TFSCRIPT_CF: 'infra/CloudFoundry'
+  PATH_TO_TFSCRIPT_BTP: infra/BTP
 
 jobs:
-  create_subaccount:
-    name: Create Subaccount for Project
-    if: ${{ !github.event.issue.pull_request }} && contains(github.event.issue.body, 'Project Name')
+  create-or-update-subaccounts:
+    name: Create or Update BTP Setup
+    if: ${{ !github.event.issue.pull_request && contains(github.event.issue.title, '[ACCOUNT REQUEST]') }}
     runs-on: ubuntu-latest
     environment: dev
-    steps:
-####
-# If you want to add a manual approval step instead of using environments on GitHub, uncomment the following lines
-# In Addition remove the environment: dev line from the job definition and the concurrency group definition
-####
-#      - name: trigger approval
-#        uses: trstringer/manual-approval@v1
-#        with:
-#          secret: ${{ github.TOKEN }}
-#          approvers: lechnerc77
-#          minimum-approvals: 1
-#          issue-title: "Approval of new project subaccount"
-#          issue-body: "Please approve or deny the request."
-#          exclude-workflow-initiator-as-approver: false
-#          additional-approved-words: ''
-#          additional-denied-words: ''
 
+    steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Extract Issue Data
         id: extract_data
@@ -48,85 +29,116 @@ jobs:
           body: ${{ github.event.issue.body }}
           issue-form-template: account_request.yml
 
-      - name: Output Issue JSON
-        id: output_issue_data
+      - name: Build Terraform Inputs
+        id: tf_inputs
+        shell: bash
+        env:
+          GLOBALACCOUNT_DEFAULT: ${{ secrets.GLOBALACCOUNT }}
         run: |
+          set -euo pipefail
+
           echo '${{ steps.extract_data.outputs.json }}' | jq '.' > local.json
-          echo "project-name=$(jq -r '."project-name"' local.json)" >> $GITHUB_OUTPUT
-          echo "cost-center=$(jq -r '."cost-center"' local.json)" >> $GITHUB_OUTPUT
-          echo "space-manager=$(jq -r '."space-manager"' local.json)" >> $GITHUB_OUTPUT
-          echo "subaccount-region=$(jq -r '."subaccount-region"[0]' local.json)" >> $GITHUB_OUTPUT
-          echo "subaccount-stage=$(jq -r '."subaccount-stage"[0]' local.json)" >> $GITHUB_OUTPUT
+
+          globalaccount=$(jq -r '.["globalaccount"] // ""' local.json)
+          if [ -z "$globalaccount" ]; then
+            globalaccount="$GLOBALACCOUNT_DEFAULT"
+          fi
+
+          project_name=$(jq -r '.["project-name"] // ""' local.json)
+          project_costcenter=$(jq -r '.["cost-center"] // ""' local.json)
+          integration_suite_enabled=$(jq -r '.["integration-suite-enabled"][0] // "false"' local.json)
+          integration_suite_assign_roles=$(jq -r '.["integration-suite-assign-roles-to-full-admins"][0] // "false"' local.json)
+          integration_suite_service_name=$(jq -r '.["integration-suite-service-name"] // "integrationsuite-trial"' local.json)
+          integration_suite_plan_name=$(jq -r '.["integration-suite-plan-name"] // ""' local.json)
+          integration_suite_entitlement_amount=$(jq -r '.["integration-suite-entitlement-amount"] // "1"' local.json)
+
+          subaccount_full_admins_json=$(jq -c -r '
+            (.["subaccount-full-admins"] // "")
+            | split("\n")
+            | map(gsub("^\\s+|\\s+$"; ""))
+            | map(select(length > 0))
+          ' local.json)
+
+          integration_suite_admin_users_json=$(jq -c -r '
+            (.["integration-suite-admin-users"] // "")
+            | split("\n")
+            | map(gsub("^\\s+|\\s+$"; ""))
+            | map(select(length > 0))
+          ' local.json)
+
+          integration_suite_subaccounts_json=$(jq -c -r '
+            (.["integration-suite-subaccounts"] // [])
+          ' local.json)
+
+          integration_suite_plan_candidates_json=$(jq -c -r '
+            (.["integration-suite-plan-candidates"] // "")
+            | split("\n")
+            | map(gsub("^\\s+|\\s+$"; ""))
+            | map(select(length > 0))
+          ' local.json)
+
+          {
+            echo "globalaccount=$globalaccount"
+            echo "project_name=$project_name"
+            echo "project_costcenter=$project_costcenter"
+            echo "integration_suite_enabled=$integration_suite_enabled"
+            echo "integration_suite_assign_roles=$integration_suite_assign_roles"
+            echo "integration_suite_service_name=$integration_suite_service_name"
+            echo "integration_suite_plan_name=$integration_suite_plan_name"
+            echo "integration_suite_entitlement_amount=$integration_suite_entitlement_amount"
+            echo "subaccount_full_admins_json=$subaccount_full_admins_json"
+            echo "integration_suite_admin_users_json=$integration_suite_admin_users_json"
+            echo "integration_suite_subaccounts_json=$integration_suite_subaccounts_json"
+            echo "integration_suite_plan_candidates_json=$integration_suite_plan_candidates_json"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_wrapper: false
-          terraform_version: latest
 
-      - name: Init Terraform for BTP
+      - name: Terraform Init
         shell: bash
-        run: |
-          terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} init -no-color
+        run: terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} init -no-color
 
-      - name: Terraform Apply for BTP
+      - name: Terraform Apply
         shell: bash
-        run: |
-            export BTP_USERNAME=${{ secrets.BTP_USERNAME }}
-            export BTP_PASSWORD=${{ secrets.BTP_PASSWORD }}
-            export TF_VAR_globalaccount=${{ secrets.GLOBALACCOUNT }}
-            export TF_VAR_project_name='${{ steps.output_issue_data.outputs.project-name }}'
-            export TF_VAR_subaccount_region=${{ steps.output_issue_data.outputs.subaccount-region }}
-            export TF_VAR_subaccount_stage=${{ steps.output_issue_data.outputs.subaccount-stage }}
-            export TF_VAR_project_costcenter=${{ steps.output_issue_data.outputs.cost-center }}
-            terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} apply -auto-approve -no-color
+        env:
+          BTP_USERNAME: ${{ secrets.BTP_USERNAME }}
+          BTP_PASSWORD: ${{ secrets.BTP_PASSWORD }}
+          TF_VAR_globalaccount: ${{ steps.tf_inputs.outputs.globalaccount }}
+          TF_VAR_project_name: ${{ steps.tf_inputs.outputs.project_name }}
+          TF_VAR_project_costcenter: ${{ steps.tf_inputs.outputs.project_costcenter }}
+          TF_VAR_subaccount_full_admins: ${{ steps.tf_inputs.outputs.subaccount_full_admins_json }}
+          TF_VAR_integration_suite_enabled: ${{ steps.tf_inputs.outputs.integration_suite_enabled }}
+          TF_VAR_integration_suite_subaccounts: ${{ steps.tf_inputs.outputs.integration_suite_subaccounts_json }}
+          TF_VAR_integration_suite_admin_users: ${{ steps.tf_inputs.outputs.integration_suite_admin_users_json }}
+          TF_VAR_integration_suite_assign_roles_to_full_admins: ${{ steps.tf_inputs.outputs.integration_suite_assign_roles }}
+          TF_VAR_integration_suite_service_name: ${{ steps.tf_inputs.outputs.integration_suite_service_name }}
+          TF_VAR_integration_suite_plan_name: ${{ steps.tf_inputs.outputs.integration_suite_plan_name }}
+          TF_VAR_integration_suite_plan_name_candidates: ${{ steps.tf_inputs.outputs.integration_suite_plan_candidates_json }}
+          TF_VAR_integration_suite_entitlement_amount: ${{ steps.tf_inputs.outputs.integration_suite_entitlement_amount }}
+        run: terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} apply -auto-approve -no-color
 
-      - name: Transfer BTP output values
-        id: terraform_output_btp
+      - name: Capture Terraform Outputs
+        id: tf_output
         shell: bash
         run: |
           terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} output -json > output_btp.json
-          echo "cf_api_url=$(jq -r '.cf_api_url.value' output_btp.json)" >> $GITHUB_OUTPUT
-          echo "cf_org_id=$(jq -r '.cf_org_id.value' output_btp.json)" >> $GITHUB_OUTPUT
-          echo "subaccount_url=$(jq -r '.subaccount_url.value' output_btp.json)" >> $GITHUB_OUTPUT
+          echo "subaccount_urls=$(jq -c '.subaccount_urls.value' output_btp.json)" >> "$GITHUB_OUTPUT"
+          echo "integration_suite_subscription_urls=$(jq -c '.integration_suite_subscription_urls.value // {}' output_btp.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Init Terraform for CF
-        shell: bash
-        run: |
-          terraform -chdir=${{ env.PATH_TO_TFSCRIPT_CF }} init -no-color
-
-      - name: Terraform Apply for CF
-        shell: bash
-        run: |
-            export CF_USER=${{ secrets.BTP_USERNAME }}
-            export CF_PASSWORD=${{ secrets.BTP_PASSWORD }}
-            export TF_VAR_project_name='${{ steps.output_issue_data.outputs.project-name }}'
-            export TF_VAR_subaccount_stage=${{ steps.output_issue_data.outputs.subaccount-stage }}
-            export TF_VAR_cf_org_id=${{ steps.terraform_output_btp.outputs.cf_org_id }}
-            export TF_VAR_cf_api_url=${{ steps.terraform_output_btp.outputs.cf_api_url }}
-            export TF_VAR_subaccount_url=${{ steps.terraform_output_btp.outputs.subaccount_url }}
-            export TF_VAR_cf_space_manager=${{ steps.output_issue_data.outputs.space-manager }}
-            export TF_VAR_cf_space_developer=${{ steps.output_issue_data.outputs.space-manager }}
-            terraform -chdir=${{ env.PATH_TO_TFSCRIPT_CF }} apply -auto-approve -no-color
-
-      - name: Transfer Cloud Foundry output values
-        id: terraform_output_cf
-        shell: bash
-        run: |
-            terraform -chdir=${{ env.PATH_TO_TFSCRIPT_CF }} output -json > output_cf.json
-            echo "cf_space_url=$(jq -r '.cf_space_url.value' output_cf.json)" >> $GITHUB_OUTPUT
-
-      - name: Add comment to issue
+      - name: Comment Back To Issue
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
-            The subaccount for the project has been created successfully 🎉
+            Provisioning completed.
 
-            Here is the relevant information for the project team:
+            Subaccount URLs:
+            `${{ steps.tf_output.outputs.subaccount_urls }}`
 
-              Subaccount URL: ${{ steps.terraform_output_btp.outputs.subaccount_url }}
-              CF API URL: ${{ steps.terraform_output_btp.outputs.cf_api_url }}
-              CF Space URL: ${{ steps.terraform_output_cf.outputs.cf_space_url }}
+            Integration Suite Subscription URLs:
+            `${{ steps.tf_output.outputs.integration_suite_subscription_urls }}`
 
-            🚀 Build some awesome apps with it!
+            Applied from issue form inputs through TF_VAR_* environment variables.

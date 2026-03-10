@@ -1,19 +1,46 @@
-output "cf_api_url" {
-  value       = jsondecode(btp_subaccount_environment_instance.cloudfoundry.labels)["API Endpoint"]
-  description = "The Cloud Foundry API URL"
+output "subaccount_ids" {
+  description = "IDs of the created SAP BTP subaccounts keyed by environment name"
+  value = {
+    for key, subaccount in btp_subaccount.environment : key => subaccount.id
+  }
 }
 
-output "cf_landscape_label" {
-  value       = btp_subaccount_environment_instance.cloudfoundry.landscape_label
-  description = "The Cloud Foundry landscape label"
+output "subaccount_names" {
+  description = "Names of the created SAP BTP subaccounts keyed by environment name"
+  value = {
+    for key, subaccount in btp_subaccount.environment : key => subaccount.name
+  }
 }
 
-output "cf_org_id" {
-  value       = jsondecode(btp_subaccount_environment_instance.cloudfoundry.labels)["Org ID"]
-  description = "The Cloud Foundry organization ID"
+output "subaccount_subdomains" {
+  description = "Subdomains of the created SAP BTP subaccounts keyed by environment name"
+  value = {
+    for key, subaccount in btp_subaccount.environment : key => subaccount.subdomain
+  }
 }
 
-output "subaccount_url" {
-  value       = "https://account.hanatrial.ondemand.com/trial/#/globalaccount/${data.btp_globalaccount.this.id}/subaccount/${btp_subaccount.project_subaccount.id}"
-  description = "The SAP BTP subaccount URL"
+output "subaccount_urls" {
+  description = "Cockpit URLs of the created SAP BTP subaccounts keyed by environment name"
+  value = {
+    for key, subaccount in btp_subaccount.environment : key => "https://account.hanatrial.ondemand.com/trial/#/globalaccount/${data.btp_globalaccount.this.id}/subaccount/${subaccount.id}"
+  }
+}
+
+output "integration_suite_selected_plans" {
+  description = "Selected Integration Suite plan names keyed by environment name"
+  value       = local.integration_suite_plan_by_subaccount
+}
+
+output "integration_suite_subscription_ids" {
+  description = "Integration Suite subscription IDs keyed by environment name"
+  value = {
+    for key, subscription in btp_subaccount_subscription.integration_suite : key => subscription.id
+  }
+}
+
+output "integration_suite_subscription_urls" {
+  description = "Integration Suite subscription URLs keyed by environment name"
+  value = {
+    for key, subscription in btp_subaccount_subscription.integration_suite : key => subscription.subscription_url
+  }
 }
