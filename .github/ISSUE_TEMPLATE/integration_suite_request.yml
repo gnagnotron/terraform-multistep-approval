@@ -47,14 +47,17 @@ body:
     validations:
       required: true
 
-  - type: checkboxes
-    id: integration-suite-subaccounts
+  - type: textarea
+    id: integration-suite-subaccount-ids
     attributes:
-      label: Integration Suite Target Subaccounts
-      description: Subaccounts where Integration Suite will be enabled (TF_VAR_integration_suite_subaccounts)
-      options:
-        - label: test
-        - label: prod
+      label: Target Subaccount IDs
+      description: |
+        Existing BTP subaccount IDs where Integration Suite will be enabled.
+        One entry per line in format: label=subaccount-id
+        The label is used as Terraform key — keep it stable across runs.
+      placeholder: |
+        test=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        prod=yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy
     validations:
       required: true
 

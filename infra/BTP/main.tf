@@ -2,6 +2,18 @@ data "btp_globalaccount" "this" {}
 
 data "btp_globalaccount_entitlements" "this" {}
 
+data "btp_subaccount" "existing_for_is" {
+  for_each = var.integration_suite_enabled ? var.integration_suite_existing_subaccount_ids : {}
+  id       = each.value
+}
+
+data "btp_subaccount_role_collections" "existing_is_role_collections" {
+  for_each      = var.integration_suite_enabled ? var.integration_suite_existing_subaccount_ids : {}
+  subaccount_id = each.value
+
+  depends_on = [btp_subaccount_subscription.integration_suite]
+}
+
 resource "random_uuid" "subaccount_suffix" {
   for_each = var.subaccounts
 }
@@ -43,10 +55,14 @@ locals {
     ]) : assignment.key => assignment
   }
 
-  integration_suite_targets = var.integration_suite_enabled ? {
-    for key, subaccount in btp_subaccount.environment : key => subaccount
-    if contains(var.integration_suite_subaccounts, key)
-  } : {}
+  integration_suite_targets = var.integration_suite_enabled ? (
+    length(var.integration_suite_existing_subaccount_ids) > 0
+    ? data.btp_subaccount.existing_for_is
+    : {
+        for key, subaccount in btp_subaccount.environment : key => subaccount
+        if contains(var.integration_suite_subaccounts, key)
+      }
+  ) : {}
 
     integration_suite_global_account_plans = toset([
       for entitlement in values(data.btp_globalaccount_entitlements.this.values) : entitlement.plan_name
@@ -64,10 +80,16 @@ locals {
     )
   } : {}
 
+  integration_suite_role_collections = var.integration_suite_enabled ? (
+    length(var.integration_suite_existing_subaccount_ids) > 0
+    ? data.btp_subaccount_role_collections.existing_is_role_collections
+    : { for key, _ in local.integration_suite_targets : key => data.btp_subaccount_role_collections.all[key] }
+  ) : {}
+
   integration_suite_role_assignments = var.integration_suite_enabled ? {
     for assignment in flatten([
-      for subaccount_key, subaccount in btp_subaccount.environment : [
-        for rc in data.btp_subaccount_role_collections.all[subaccount_key].values : [
+      for subaccount_key, subaccount in local.integration_suite_targets : [
+        for rc in local.integration_suite_role_collections[subaccount_key].values : [
           for user in var.integration_suite_admin_users : {
             key           = "${subaccount_key}:${rc.name}:${user}"
             subaccount_id = subaccount.id
@@ -81,7 +103,6 @@ locals {
           if strcontains(lower(rc.name), lower(pattern))
         ]) > 0
       ]
-      if contains(var.integration_suite_subaccounts, subaccount_key)
     ]) : assignment.key => assignment
   } : {}
 }

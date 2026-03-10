@@ -137,3 +137,9 @@ variable "integration_suite_entitlement_amount" {
   type        = number
   default     = 1
 }
+
+variable "integration_suite_existing_subaccount_ids" {
+  description = "Map of label to existing subaccount ID for IS deployment. When non-empty, IS is applied to these subaccounts instead of newly created ones."
+  type        = map(string)
+  default     = {}
+}
