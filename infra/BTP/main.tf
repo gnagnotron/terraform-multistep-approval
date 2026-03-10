@@ -33,15 +33,12 @@ locals {
 
   full_admin_assignments = {
     for assignment in flatten([
-      for subaccount_key, subaccount in btp_subaccount.environment : [
-        for rc in data.btp_subaccount_role_collections.all[subaccount_key].values : [
-          for user in var.subaccount_full_admins : {
-            key           = "${subaccount_key}:${rc.name}:${user}"
-            subaccount_id = subaccount.id
-            rc_name       = rc.name
-            user          = user
-          }
-        ]
+      for subaccount_key in keys(local.normalized_subaccounts) : [
+        for user in var.subaccount_full_admins : {
+          key            = "${subaccount_key}:${user}"
+          subaccount_key = subaccount_key
+          user           = user
+        }
       ]
     ]) : assignment.key => assignment
   }
@@ -127,8 +124,8 @@ data "btp_subaccount_role_collections" "all" {
 resource "btp_subaccount_role_collection_assignment" "full_admins" {
   for_each = local.full_admin_assignments
 
-  subaccount_id        = each.value.subaccount_id
-  role_collection_name = each.value.rc_name
+  subaccount_id        = btp_subaccount.environment[each.value.subaccount_key].id
+  role_collection_name = "Subaccount Administrator"
   user_name            = each.value.user
 }
 
