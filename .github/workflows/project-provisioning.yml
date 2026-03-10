@@ -14,7 +14,7 @@ env:
 jobs:
   create-or-update-subaccounts:
     name: Create or Update BTP Setup
-    if: ${{ !github.event.issue.pull_request && contains(github.event.issue.title, '[ACCOUNT REQUEST]') }}
+    if: ${{ !github.event.issue.pull_request && (contains(github.event.issue.title, '[ACCOUNT REQUEST]') || contains(github.event.issue.title, '[INTEGRATION SUITE REQUEST]')) }}
     runs-on: ubuntu-latest
     environment: dev
 
@@ -27,7 +27,7 @@ jobs:
         uses: issue-ops/parser@v4
         with:
           body: ${{ github.event.issue.body }}
-          issue-form-template: account_request.yml
+          issue-form-template: ${{ contains(github.event.issue.title, '[INTEGRATION SUITE REQUEST]') && 'integration_suite_request.yml' || 'account_request.yml' }}
 
       - name: Build Terraform Inputs
         id: tf_inputs
@@ -50,11 +50,6 @@ jobs:
 
           project_name=$(jq -r '.["project-name"] // ""' local.json)
           project_costcenter=$(jq -r '.["cost-center"] // ""' local.json)
-          integration_suite_enabled=$(jq -r '.["integration-suite-enabled"][0] // "false"' local.json)
-          integration_suite_assign_roles=$(jq -r '.["integration-suite-assign-roles-to-full-admins"][0] // "false"' local.json)
-          integration_suite_service_name=$(jq -r '.["integration-suite-service-name"] // "integrationsuite-trial"' local.json)
-          integration_suite_plan_name=$(jq -r '.["integration-suite-plan-name"] // ""' local.json)
-          integration_suite_entitlement_amount=$(jq -r '.["integration-suite-entitlement-amount"] // "1"' local.json)
 
           subaccount_full_admins_json=$(jq -c -r '
             (.["subaccount-full-admins"] // "")
@@ -63,30 +58,43 @@ jobs:
             | map(select(length > 0))
           ' local.json)
 
-          integration_suite_admin_users_json=$(jq -c -r '
-            (.["integration-suite-admin-users"] // "")
-            | split("\n")
-            | map(gsub("^\\s+|\\s+$"; ""))
-            | map(select(length > 0))
-          ' local.json)
+          is_integration_suite_issue="${{ contains(github.event.issue.title, '[INTEGRATION SUITE REQUEST]') }}"
 
-          integration_suite_subaccounts_json=$(jq -c -r '
-            (.["integration-suite-subaccounts"] // [])
-            | if type == "array" then
-                map(tostring)
-              elif type == "string" then
-                split("\n") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))
-              else
-                []
-              end
-          ' local.json)
-
-          integration_suite_plan_candidates_json=$(jq -c -r '
-            (.["integration-suite-plan-candidates"] // "")
-            | split("\n")
-            | map(gsub("^\\s+|\\s+$"; ""))
-            | map(select(length > 0))
-          ' local.json)
+          if [ "$is_integration_suite_issue" = "true" ]; then
+            integration_suite_enabled="true"
+            integration_suite_assign_roles=$(jq -r '.["integration-suite-assign-roles-to-full-admins"][0] // "false"' local.json)
+            integration_suite_service_name=$(jq -r '.["integration-suite-service-name"] // "integrationsuite-trial"' local.json)
+            integration_suite_plan_name=$(jq -r '.["integration-suite-plan-name"] // ""' local.json)
+            integration_suite_entitlement_amount=$(jq -r '.["integration-suite-entitlement-amount"] // "1"' local.json)
+            integration_suite_admin_users_json=$(jq -c -r '
+              (.["integration-suite-admin-users"] // "")
+              | split("\n")
+              | map(gsub("^\\s+|\\s+$"; ""))
+              | map(select(length > 0))
+            ' local.json)
+            integration_suite_subaccounts_json=$(jq -c -r '
+              (.["integration-suite-subaccounts"] // [])
+              | if type == "array" then map(tostring)
+                elif type == "string" then split("\n") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))
+                else []
+                end
+            ' local.json)
+            integration_suite_plan_candidates_json=$(jq -c -r '
+              (.["integration-suite-plan-candidates"] // "")
+              | split("\n")
+              | map(gsub("^\\s+|\\s+$"; ""))
+              | map(select(length > 0))
+            ' local.json)
+          else
+            integration_suite_enabled="false"
+            integration_suite_assign_roles="false"
+            integration_suite_service_name="integrationsuite-trial"
+            integration_suite_plan_name=""
+            integration_suite_entitlement_amount="1"
+            integration_suite_admin_users_json="[]"
+            integration_suite_subaccounts_json="[]"
+            integration_suite_plan_candidates_json='["trial","standard"]'
+          fi
 
           {
             echo "globalaccount=$globalaccount"

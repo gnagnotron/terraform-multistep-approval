@@ -1,12 +1,12 @@
 name: Subaccount Request
-description: File a request to provision or update a project setup on SAP BTP
+description: Request the provisioning of BTP subaccounts for a project
 title: "[ACCOUNT REQUEST]"
 labels: [account-request]
 body:
   - type: markdown
     attributes:
       value: |
-        Use this form to provide Terraform input variables for provisioning.
+        Use this form to provision BTP subaccounts for a project.
         Do not include passwords or tokens here.
 
   - type: input
@@ -44,82 +44,5 @@ body:
       placeholder: |
         user1@example.com
         user2@example.com
-    validations:
-      required: true
-
-  - type: dropdown
-    id: integration-suite-enabled
-    attributes:
-      label: Enable Integration Suite
-      description: Value for TF_VAR_integration_suite_enabled
-      options:
-        - "true"
-        - "false"
-      default: 0
-    validations:
-      required: true
-
-  - type: checkboxes
-    id: integration-suite-subaccounts
-    attributes:
-      label: Integration Suite Target Subaccounts
-      description: Values for TF_VAR_integration_suite_subaccounts
-      options:
-        - label: test
-        - label: prod
-
-  - type: textarea
-    id: integration-suite-admin-users
-    attributes:
-      label: Integration Suite Admin Users
-      description: One email per line (mapped to TF_VAR_integration_suite_admin_users)
-      placeholder: |
-        user1@example.com
-
-  - type: dropdown
-    id: integration-suite-assign-roles-to-full-admins
-    attributes:
-      label: Assign Integration Suite Focused Roles Also To Full Admins
-      description: Value for TF_VAR_integration_suite_assign_roles_to_full_admins
-      options:
-        - "false"
-        - "true"
-      default: 0
-    validations:
-      required: true
-
-  - type: input
-    id: integration-suite-service-name
-    attributes:
-      label: Integration Suite Service Technical Name
-      description: Value for TF_VAR_integration_suite_service_name
-      placeholder: integrationsuite-trial
-      value: integrationsuite-trial
-    validations:
-      required: true
-
-  - type: input
-    id: integration-suite-plan-name
-    attributes:
-      label: Integration Suite Plan Name Override
-      description: Optional value for TF_VAR_integration_suite_plan_name; leave empty for auto-select
-      placeholder: Leave empty for auto-select
-
-  - type: textarea
-    id: integration-suite-plan-candidates
-    attributes:
-      label: Integration Suite Plan Candidate Names
-      description: One plan per line (mapped to TF_VAR_integration_suite_plan_name_candidates)
-      placeholder: |
-        trial
-        standard
-
-  - type: input
-    id: integration-suite-entitlement-amount
-    attributes:
-      label: Integration Suite Entitlement Amount
-      description: Value for TF_VAR_integration_suite_entitlement_amount
-      placeholder: "1"
-      value: "1"
     validations:
       required: true
