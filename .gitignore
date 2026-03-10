@@ -44,5 +44,8 @@ terraform.rc
 # Env for Terraform
 .env
 
+# Local test simulation files (contain IDs and credentials)
+local-test/
+
 # exclude the folder for the learning course as described in unit 2.1
 learning-terraform-on-sapbtp
