@@ -103,7 +103,7 @@ body:
     attributes:
       label: Integration Suite Plan Name Override
       description: Optional value for TF_VAR_integration_suite_plan_name; leave empty for auto-select
-      placeholder: ""
+      placeholder: Leave empty for auto-select
 
   - type: textarea
     id: integration-suite-plan-candidates
