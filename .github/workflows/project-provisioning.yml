@@ -148,7 +148,18 @@ jobs:
           TF_VAR_integration_suite_plan_name_candidates: ${{ steps.tf_inputs.outputs.integration_suite_plan_candidates_json }}
           TF_VAR_integration_suite_entitlement_amount: ${{ steps.tf_inputs.outputs.integration_suite_entitlement_amount }}
           TF_VAR_integration_suite_existing_subaccount_ids: ${{ steps.tf_inputs.outputs.integration_suite_subaccount_ids_json }}
-        run: terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} apply -auto-approve -no-color
+        run: |
+          is_existing_sa=$(echo '${{ steps.tf_inputs.outputs.integration_suite_subaccount_ids_json }}' | jq -r 'length > 0')
+          if [[ "${{ steps.tf_inputs.outputs.integration_suite_enabled }}" == "true" ]] && [[ "$is_existing_sa" == "true" ]]; then
+            # Pass 1: create entitlement + subscription (role collection names are unknown until subscription exists)
+            terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} apply -auto-approve -no-color \
+              -target='btp_subaccount_entitlement.integration_suite' \
+              -target='btp_subaccount_subscription.integration_suite'
+            # Pass 2: assign roles (role collections are now readable)
+            terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} apply -auto-approve -no-color
+          else
+            terraform -chdir=${{ env.PATH_TO_TFSCRIPT_BTP }} apply -auto-approve -no-color
+          fi
 
       - name: Capture Terraform Outputs
         id: tf_output

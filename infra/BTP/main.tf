@@ -80,12 +80,15 @@ locals {
     )
   } : {}
 
-  integration_suite_role_collections = var.integration_suite_enabled && length(var.integration_suite_existing_subaccount_ids) == 0 ? (
-    { for key, _ in local.integration_suite_targets : key => data.btp_subaccount_role_collections.all[key] }
+  integration_suite_role_collections = var.integration_suite_enabled ? (
+    length(var.integration_suite_existing_subaccount_ids) > 0
+    ? data.btp_subaccount_role_collections.existing_is_role_collections
+    : { for key, _ in local.integration_suite_targets : key => data.btp_subaccount_role_collections.all[key] }
   ) : {}
 
-  # Only assign IS-specific roles when creating new subaccounts (not when targeting existing subaccounts)
-  integration_suite_role_assignments = var.integration_suite_enabled && length(var.integration_suite_existing_subaccount_ids) == 0 ? {
+  # NOTE: On first apply (subscription being created), role collection names are unknown so this will be empty.
+  # Run terraform apply a second time after subscription creation to assign roles.
+  integration_suite_role_assignments = var.integration_suite_enabled ? {
     for assignment in flatten([
       for subaccount_key, subaccount in local.integration_suite_targets : [
         for rc in local.integration_suite_role_collections[subaccount_key].values : [
